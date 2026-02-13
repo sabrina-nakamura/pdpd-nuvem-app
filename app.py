@@ -5,7 +5,7 @@ import mne
 import pandas as pd
 from nilearn import plotting, image
 
-st.title("Laboratório Universal com IA - PDPD 🧠🤖")
+st.title("Laboratório Universal com IA - PDPD 🧠✨")
 st.write("Faça o upload do seu arquivo e digite comandos livres para a IA analisar, comentar ou sugerir abordagens.")
 
 # A PORTA FOI ABERTA PARA TODOS OS FORMATOS:
