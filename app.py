@@ -2,8 +2,8 @@ import streamlit as st
 import os
 import tempfile
 import mne
-from nilearn import plotting, image
 import matplotlib.pyplot as plt
+from nilearn import plotting, image
 
 st.title("Laboratório Universal do PDPD 🧠")
 st.write("Faça o upload do seu arquivo de neuroimagem ou sinais. O sistema fará o roteamento automático.")
@@ -35,11 +35,14 @@ if arquivo_carregado is not None:
         comando = st.radio("Escolha a análise:", ["Visualizar Fatias 3D"])
         
         if st.button("Executar Análise"):
-            with st.spinner("Desenhando o cérebro 3D... Isso exige muito processamento, aguarde uns segundos!"):
+            with st.spinner("Fatiando o filme 4D e desenhando o cérebro 3D... Aguarde!"):
                 try:
-                    # O nilearn lê o arquivo temporário e gera o HTML interativo
-                    st.subheader("Visualização Interativa")
-                    html_view = plotting.view_img(caminho_temporario, bg_img=False).get_iframe()
+                    # O SEGREDO: Pega o primeiro "frame" (tempo 0) do filme 4D do fMRI
+                    imagem_3d = image.index_img(caminho_temporario, 0)
+                    
+                    # Desenha a visualização usando apenas esse frame 3D
+                    st.subheader("Visualização Interativa (Frame 0)")
+                    html_view = plotting.view_img(imagem_3d, bg_img=False).get_iframe()
                     st.components.v1.html(html_view, height=450)
                 except Exception as e:
                     st.error(f"Erro ao processar a imagem: {e}")
