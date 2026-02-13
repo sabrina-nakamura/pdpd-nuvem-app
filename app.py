@@ -53,7 +53,7 @@ for msg in st.session_state.mensagens:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-if prompt := st.chat_input("Ex: 'Aplique um filtro passa-banda e analise os ruídos'"):
+if prompt := st.chat_input("Ex: 'O que tem nesse arquivo?' ou 'Filtre os sinais'"):
     st.session_state.mensagens.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -62,9 +62,65 @@ if prompt := st.chat_input("Ex: 'Aplique um filtro passa-banda e analise os ruí
         cmd = prompt.lower()
         
         if not dados_objeto:
-            resposta = "Sabrina, notei que não há nenhum arquivo carregado. Por favor, suba um dado na lateral para começarmos a análise técnica."
-            st.markdown(resposta)
-            st.session_state.mensagens.append({"role": "assistant", "content": resposta})
+            res = "Sabrina, eu ainda não consigo ver o conteúdo porque nenhum arquivo foi carregado na barra lateral. Pode subir um pra mim?"
+            st.markdown(res)
+            st.session_state.mensagens.append({"role": "assistant", "content": res})
+        
+        # --- NOVA LÓGICA: INVESTIGAR CONTEÚDO ---
+        elif any(x in cmd for x in ["contido", "conteudo", "que arquivo", "que e isso", "tem nesse"]):
+            with st.spinner("Inspecionando metadados e cabeçalhos..."):
+                if resumo_ia == "EEG_DATA":
+                    info = dados_objeto.info
+                    canais = dados_objeto.ch_names
+                    freq = info['sfreq']
+                    # Verifica se é Raw ou Epochs para calcular a duração
+                    if isinstance(dados_objeto, mne.epochs.BaseEpochs):
+                        duracao = f"{len(dados_objeto)} épocas (trials)"
+                    else:
+                        duracao = f"{dados_objeto.times[-1]:.2f} segundos"
+
+                    res = f"""🔍 **Inventário do Arquivo de EEG:**
+                    Este arquivo contém uma gravação de sinais eletrofisiológicos com as seguintes especificações:
+                    * **Canais:** {len(canais)} eletrodos (ex: {', '.join(canais[:5])}...).
+                    * **Taxa de Amostragem:** {freq} Hz (pontos por segundo).
+                    * **Extensão Temporal:** {duracao}.
+                    * **Status:** Pronto para pré-processamento e filtragem de artefatos."""
+                    
+                elif resumo_ia == "MRI_3D":
+                    shape = dados_objeto.shape
+                    res = f"""🧠 **Inventário do Arquivo de MRI:**
+                    Este é um volume de Ressonância Magnética estrutural/funcional:
+                    * **Dimensões da Matriz:** {shape[0]}x{shape[1]}x{shape[2]} voxels.
+                    * **Tipo:** Volume único (3D) extraído para visualização.
+                    * **Espaço:** Nativo (necessita normalização para o padrão MNI se for fazer análise de grupo)."""
+                
+                else:
+                    res = "Este parece ser um arquivo de texto ou tabela (TSV/CSV). Ele contém colunas de dados que podem representar eventos ou metadados do experimento."
+                
+                st.markdown(res)
+                st.session_state.mensagens.append({"role": "assistant", "content": res})
+
+        # --- MANTER A LÓGICA DE FILTRAGEM ---
+        elif "filtr" in cmd or "ruid" in cmd:
+            with st.spinner("Aplicando filtros neurofisiológicos..."):
+                if resumo_ia == "EEG_DATA":
+                    res = "📊 **Filtro Aplicado:** Band-pass 1-40Hz. Removi ruídos de baixa frequência e interferências musculares para destacar os potenciais cerebrais."
+                    st.markdown(res)
+                    # Processamento real
+                    filtrado = dados_objeto.copy().filter(l_freq=1, h_freq=40, verbose=False)
+                    if isinstance(dados_objeto, mne.epochs.BaseEpochs):
+                        fig = filtrado.plot(n_epochs=1, show=False, scalings='auto')
+                    else:
+                        fig = filtrado.plot(duration=5, n_channels=10, show=False, scalings='auto')
+                    st.pyplot(fig)
+                    st.session_state.mensagens.append({"role": "assistant", "content": res})
+                else:
+                    st.markdown("A filtragem de imagem (MRI) requer máscaras de segmentação. Implementarei isso em breve!")
+
+        else:
+            res = "Recebi seu comando! Como sou sua assistente de PDPD, posso te dizer o que tem no arquivo, filtrar sinais ou organizar tudo no padrão BIDS. O que prefere?"
+            st.markdown(res)
+            st.session_state.mensagens.append({"role": "assistant", "content": res})
         
         # --- LÓGICA DE FILTRAGEM REAL ---
         elif "filtr" in cmd or "ruid" in cmd:
