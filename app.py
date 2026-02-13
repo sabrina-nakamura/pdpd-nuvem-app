@@ -11,7 +11,7 @@ st.set_page_config(page_title="NeuroLab PDPD", page_icon="🧠", layout="wide")
 st.title("🧠 NeuroLab Universal com IA - PDPD")
 
 if "mensagens" not in st.session_state:
-    st.session_state.mensagens = [{"role": "assistant", "content": "Olá, Sabrina! Estou pronta para processar seus dados do PDPD. O que faremos hoje?"}]
+    st.session_state.mensagens = [{"role": "assistant", "content": "Olá, Sabrina! Estou pronta para processar seus dados. O que faremos hoje?"}]
 
 # ============================================
 # BARRA LATERAL E LEITURA DE DADOS
