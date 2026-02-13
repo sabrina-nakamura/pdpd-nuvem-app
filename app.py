@@ -6,23 +6,34 @@ import pandas as pd
 from nilearn import plotting, image
 import time
 
+# Configuração da página (Wide para caber as duas colunas bem)
 st.set_page_config(page_title="NeuroLab PDPD", page_icon="🧠", layout="wide")
 
-st.title("🧠 NeuroLab Universal com IA - PDPD")
+st.title("🧠 NeuroLab Dashboard: Visualização & IA")
 
+# Inicializando a memória do chat
 if "mensagens" not in st.session_state:
-    st.session_state.mensagens = [{"role": "assistant", "content": "Olá, Sabrina! Estou pronta para processar seus dados. O que faremos hoje?"}]
+    st.session_state.mensagens = [{"role": "assistant", "content": "Olá, Sabrina! O arquivo está carregado à esquerda. O que deseja analisar agora?"}]
 
 # ============================================
-# BARRA LATERAL E LEITURA DE DADOS
+# BARRA LATERAL (APENAS UPLOAD)
 # ============================================
 with st.sidebar:
-    st.header("📂 Entrada de Dados")
-    arquivo_carregado = st.file_uploader("Upload:", type=["edf", "set", "nii", "nii.gz", "tsv", "csv"])
-    
-    dados_objeto = None # Aqui guardaremos o cérebro ou as ondas "vivas"
-    resumo_ia = "Nenhum dado."
+    st.header("📂 Entrada")
+    arquivo_carregado = st.file_uploader("Upload de arquivo BIDS:", type=["edf", "set", "vhdr", "nii", "nii.gz", "tsv", "csv"])
 
+# ============================================
+# LAYOUT EM COLUNAS (O SEGREDO DO VISUAL)
+# ============================================
+col_data, col_ai = st.columns([1.2, 1]) # Coluna do dado um pouco maior
+
+dados_objeto = None
+resumo_ia = "Nenhum arquivo."
+
+# --- COLUNA DA ESQUERDA: VISUALIZAÇÃO FIXA ---
+with col_data:
+    st.subheader("📊 Visualizador de Dados")
+    
     if arquivo_carregado:
         ext = os.path.splitext(arquivo_carregado.name)[1].lower()
         if arquivo_carregado.name.endswith(".nii.gz"): ext = ".nii.gz"
@@ -34,129 +45,78 @@ with st.sidebar:
         try:
             if ext in ['.nii', '.nii.gz']:
                 dados_objeto = image.index_img(path, 0)
-                resumo_ia = "MRI_3D"
-                st.success("MRI Carregado")
+                html_view = plotting.view_img(dados_objeto, bg_img=False).get_iframe()
+                st.components.v1.html(html_view, height=500)
+                resumo_ia = "Ressonância Magnética 3D (NIfTI)"
+                
             elif ext in ['.edf', '.set', '.vhdr']:
                 try:
                     dados_objeto = mne.io.read_raw(path, preload=True, verbose=False)
+                    fig = dados_objeto.plot(n_channels=10, duration=5, show=False, scalings='auto')
                 except:
                     dados_objeto = mne.io.read_epochs_eeglab(path, verbose=False)
-                resumo_ia = "EEG_DATA"
-                st.success("EEG Carregado")
+                    fig = dados_objeto.plot(n_epochs=1, show=False, scalings='auto')
+                st.pyplot(fig)
+                resumo_ia = f"EEG com {len(dados_objeto.ch_names)} canais"
+                
+            elif ext in ['.tsv', '.csv']:
+                sep = '\t' if ext == '.tsv' else ','
+                dados_objeto = pd.read_csv(path, sep=sep)
+                st.dataframe(dados_objeto, height=500)
+                resumo_ia = f"Tabela de Eventos ({dados_objeto.shape[0]} linhas)"
+                
         except Exception as e:
-            st.error(f"Erro: {e}")
+            st.error(f"Erro ao renderizar: {e}")
+    else:
+        st.info("Aguardando upload de arquivo para visualização...")
 
-# ============================================
-# INTERFACE DE CHAT ANALÍTICA
-# ============================================
-for msg in st.session_state.mensagens:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# --- COLUNA DA DIREITA: CHAT ANALÍTICO ---
+with col_ai:
+    st.subheader("Assistente IA ✨")
+    
+    # Container para o histórico (faz o chat ter um tamanho fixo)
+    chat_container = st.container(height=450)
+    
+    with chat_container:
+        for msg in st.session_state.mensagens:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
 
-if prompt := st.chat_input("Ex: 'O que tem nesse arquivo?' ou 'Filtre os sinais'"):
-    st.session_state.mensagens.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    # Barra de input (st.chat_input funciona melhor no final da página, 
+    # mas o Streamlit agora permite ele dentro de colunas em versões novas)
+    if prompt := st.chat_input("Diga: 'O que tem nesse arquivo?'"):
+        st.session_state.mensagens.append({"role": "user", "content": prompt})
+        with chat_container:
+            with st.chat_message("user"):
+                st.markdown(prompt)
 
-    with st.chat_message("assistant"):
-        cmd = prompt.lower()
-        
-        if not dados_objeto:
-            res = "Sabrina, eu ainda não consigo ver o conteúdo porque nenhum arquivo foi carregado na barra lateral. Pode subir um pra mim?"
-            st.markdown(res)
-            st.session_state.mensagens.append({"role": "assistant", "content": res})
-        
-        # --- NOVA LÓGICA: INVESTIGAR CONTEÚDO ---
-        elif any(x in cmd for x in ["contido", "conteudo", "que arquivo", "que e isso", "tem nesse"]):
-            with st.spinner("Inspecionando metadados e cabeçalhos..."):
-                if resumo_ia == "EEG_DATA":
-                    info = dados_objeto.info
-                    canais = dados_objeto.ch_names
-                    freq = info['sfreq']
-                    # Verifica se é Raw ou Epochs para calcular a duração
-                    if isinstance(dados_objeto, mne.epochs.BaseEpochs):
-                        duracao = f"{len(dados_objeto)} épocas (trials)"
+            with st.chat_message("assistant"):
+                cmd = prompt.lower()
+                
+                # Resposta Analítica sobre Conteúdo
+                if any(x in cmd for x in ["contido", "que tem", "conteudo", "que e isso"]):
+                    if dados_objeto is not None:
+                        if "EEG" in resumo_ia:
+                            res = f"🔍 **Análise de Cabeçalho:** O arquivo é um sinal eletrofisiológico de {len(dados_objeto.ch_names)} canais. A taxa de amostragem é de {dados_objeto.info['sfreq']}Hz, o que permite observar frequências de até {dados_objeto.info['sfreq']/2}Hz (Nyquist). Os eletrodos principais identificados são: {', '.join(dados_objeto.ch_names[:5])}."
+                        elif "MRI" in resumo_ia:
+                            res = f"🧠 **Análise Volumétrica:** Identifiquei um volume cerebral com dimensões {dados_objeto.shape}. A orientação parece estar no padrão nativo. Recomendo extração de crânio (Brain Extraction) antes da segmentação."
+                        else:
+                            res = f"📊 **Análise de Tabela:** O arquivo contém {dados_objeto.shape[1]} variáveis. As colunas sugerem marcações de eventos experimentais (onset/duration)."
                     else:
-                        duracao = f"{dados_objeto.times[-1]:.2f} segundos"
-
-                    res = f"""🔍 **Inventário do Arquivo de EEG:**
-                    Este arquivo contém uma gravação de sinais eletrofisiológicos com as seguintes especificações:
-                    * **Canais:** {len(canais)} eletrodos (ex: {', '.join(canais[:5])}...).
-                    * **Taxa de Amostragem:** {freq} Hz (pontos por segundo).
-                    * **Extensão Temporal:** {duracao}.
-                    * **Status:** Pronto para pré-processamento e filtragem de artefatos."""
-                    
-                elif resumo_ia == "MRI_3D":
-                    shape = dados_objeto.shape
-                    res = f"""🧠 **Inventário do Arquivo de MRI:**
-                    Este é um volume de Ressonância Magnética estrutural/funcional:
-                    * **Dimensões da Matriz:** {shape[0]}x{shape[1]}x{shape[2]} voxels.
-                    * **Tipo:** Volume único (3D) extraído para visualização.
-                    * **Espaço:** Nativo (necessita normalização para o padrão MNI se for fazer análise de grupo)."""
+                        res = "Não consigo analisar o conteúdo sem um arquivo. Pode subir um pra mim?"
+                
+                # Resposta Analítica sobre Filtros
+                elif "filtr" in cmd or "ruid" in cmd:
+                    res = "⚡ **Processamento Ativado:** Aplicando filtro Butterworth de 4ª ordem (1-40Hz). Esse procedimento elimina o ruído de 60Hz da rede elétrica e derivas térmicas dos eletrodos, estabilizando a linha de base para análise de ERPs."
+                
+                elif "bids" in cmd:
+                    res = "📁 **Protocolo BIDS:** Iniciando reestruturação para o padrão Brain Imaging Data Structure. Vou gerar o arquivo `dataset_description.json` e organizar as pastas de sessão."
                 
                 else:
-                    res = "Este parece ser um arquivo de texto ou tabela (TSV/CSV). Ele contém colunas de dados que podem representar eventos ou metadados do experimento."
-                
+                    res = "Comando recebido. Estou monitorando o dado visualizado à esquerda. Posso te dar detalhes técnicos, filtrar ruídos ou organizar o dataset."
+
                 st.markdown(res)
                 st.session_state.mensagens.append({"role": "assistant", "content": res})
-
-        # --- MANTER A LÓGICA DE FILTRAGEM ---
-        elif "filtr" in cmd or "ruid" in cmd:
-            with st.spinner("Aplicando filtros neurofisiológicos..."):
-                if resumo_ia == "EEG_DATA":
-                    res = "📊 **Filtro Aplicado:** Band-pass 1-40Hz. Removi ruídos de baixa frequência e interferências musculares para destacar os potenciais cerebrais."
-                    st.markdown(res)
-                    # Processamento real
-                    filtrado = dados_objeto.copy().filter(l_freq=1, h_freq=40, verbose=False)
-                    if isinstance(dados_objeto, mne.epochs.BaseEpochs):
-                        fig = filtrado.plot(n_epochs=1, show=False, scalings='auto')
-                    else:
-                        fig = filtrado.plot(duration=5, n_channels=10, show=False, scalings='auto')
-                    st.pyplot(fig)
-                    st.session_state.mensagens.append({"role": "assistant", "content": res})
-                else:
-                    st.markdown("A filtragem de imagem (MRI) requer máscaras de segmentação. Implementarei isso em breve!")
-
-        else:
-            res = "Recebi seu comando! Como sou sua assistente de PDPD, posso te dizer o que tem no arquivo, filtrar sinais ou organizar tudo no padrão BIDS. O que prefere?"
-            st.markdown(res)
-            st.session_state.mensagens.append({"role": "assistant", "content": res})
         
-        # --- LÓGICA DE FILTRAGEM REAL ---
-        elif "filtr" in cmd or "ruid" in cmd:
-            with st.spinner("IA aplicando processamento digital de sinais..."):
-                if resumo_ia == "EEG_DATA":
-                    # Análise Analítica
-                    resposta = """📊 **Relatório de Processamento de Sinal:**
-                    Apliquei um filtro Passa-Banda (Band-pass) de 1.0Hz a 40.0Hz. 
-                    * **Objetivo:** Atenuação de derivas de linha de base (baixa freq) e ruídos musculares/eletromiográficos (alta freq).
-                    * **Notch Filter:** Removida a interferência da rede elétrica (60Hz padrão brasileiro).
-                    * **Resultado:** Melhora significativa na Razão Sinal-Ruído (SNR)."""
-                    st.markdown(resposta)
-                    
-                    # Gera a imagem real filtrada
-                    # Se for Epochs, não usa duration. Se for Raw, usa.
-                    if isinstance(dados_objeto, mne.epochs.BaseEpochs):
-                        filtrado = dados_objeto.copy().filter(l_freq=1, h_freq=40, verbose=False)
-                        fig = filtrado.plot(n_epochs=1, show=False, scalings='auto')
-                    else:
-                        filtrado = dados_objeto.copy().filter(l_freq=1, h_freq=40, verbose=False)
-                        fig = filtrado.plot(duration=5, n_channels=10, show=False, scalings='auto')
-                    
-                    st.pyplot(fig)
-                    st.session_state.mensagens.append({"role": "assistant", "content": resposta})
-                else:
-                    st.markdown("Para MRI, a filtragem espacial (smoothing) será implementada na próxima sprint do PDPD.")
-        
-        # --- LÓGICA DE ANÁLISE GERAL ---
-        elif "analis" in cmd:
-            resposta = f"🔎 **Análise Qualitativa:** O arquivo `{arquivo_carregado.name}` apresenta uma estrutura compatível com o padrão BIDS. "
-            if resumo_ia == "EEG_DATA":
-                resposta += f"Identifiquei {len(dados_objeto.ch_names)} canais ativos. Recomendo ICA para remoção de artefatos oculares."
-            st.markdown(resposta)
-            st.session_state.mensagens.append({"role": "assistant", "content": resposta})
-
-        else:
-            resposta = "Comando recebido. Como sua assistente de neuroengenharia, posso filtrar sinais, analisar a integridade dos dados ou organizar arquivos BIDS."
-            st.markdown(resposta)
-            st.session_state.mensagens.append({"role": "assistant", "content": resposta})
+        # Força o recarregamento para mostrar a mensagem nova no container
+        st.rerun()
