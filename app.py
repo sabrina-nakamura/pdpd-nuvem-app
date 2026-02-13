@@ -10,9 +10,10 @@ import google.generativeai as genai
 try:
     GENAI_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=GENAI_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash') # Versão rápida e inteligente
+    # TENTATIVA 1: Usando o identificador estável mais comum
+    model = genai.GenerativeModel('gemini-1.5-flash') 
 except Exception as e:
-    st.error("Erro na Chave API: Verifique se configurou o 'Secrets' no Streamlit.")
+    st.error(f"Erro na Configuração da IA: {e}")
 
 st.set_page_config(page_title="NeuroLab Gemini", page_icon="🧠", layout="wide")
 
@@ -21,21 +22,22 @@ st.caption("Assistente de Neuroengenharia conectado ao cérebro do Google.")
 
 # Memória do Chat
 if "mensagens" not in st.session_state:
-    st.session_state.mensagens = [{"role": "assistant", "content": "Olá, Sabrina! O Gemini está online. Faça o upload do arquivo para começarmos a análise real."}]
+    st.session_state.mensagens = [{"role": "assistant", "content": "Olá, Sabrina! O Gemini está pronto. Vamos analisar esses dados do seu PDPD?"}]
 
 # ============================================
-# BARRA LATERAL
+# BARRA LATERAL (UPLOAD)
 # ============================================
 with st.sidebar:
-    st.header("📂 Entrada")
+    st.header("📂 Entrada de Dados")
     arquivo_carregado = st.file_uploader("Upload BIDS:", type=["edf", "set", "vhdr", "nii", "nii.gz", "tsv", "csv"])
+    
+    contexto_tecnico = "Nenhum arquivo carregado."
+    dados_objeto = None
 
 # ============================================
-# LAYOUT E PROCESSAMENTO
+# LAYOUT DIVIDIDO (VISUALIZAÇÃO À ESQUERDA)
 # ============================================
 col_visual, col_chat = st.columns([1.2, 1])
-dados_objeto = None
-contexto_tecnico = "Nenhum dado carregado."
 
 with col_visual:
     st.subheader("📊 Visualizador")
@@ -51,7 +53,7 @@ with col_visual:
             if ext in ['.nii', '.nii.gz']:
                 dados_objeto = image.index_img(path, 0)
                 st.components.v1.html(plotting.view_img(dados_objeto, bg_img=False).get_iframe(), height=450)
-                contexto_tecnico = f"Arquivo MRI NIfTI. Dimensões: {dados_objeto.shape}. "
+                contexto_tecnico = f"MRI NIfTI. Dimensões: {dados_objeto.shape}."
             
             elif ext in ['.edf', '.set', '.vhdr']:
                 try:
@@ -60,40 +62,44 @@ with col_visual:
                     dados_objeto = mne.io.read_epochs_eeglab(path, verbose=False)
                 
                 st.pyplot(dados_objeto.plot(n_channels=10, show=False, scalings='auto'))
-                contexto_tecnico = f"EEG com {len(dados_objeto.ch_names)} canais: {dados_objeto.ch_names}. Freq: {dados_objeto.info['sfreq']}Hz."
+                contexto_tecnico = f"EEG com {len(dados_objeto.ch_names)} canais. Freq: {dados_objeto.info['sfreq']}Hz."
         except Exception as e:
-            st.error(f"Erro: {e}")
+            st.error(f"Erro na visualização: {e}")
+    else:
+        st.info("Aguardando upload na barra lateral...")
 
 # ============================================
-# CHAT REAL COM GEMINI
+# CHAT COM GEMINI (DIREITA)
 # ============================================
 with col_chat:
-    st.subheader("Assistente Gemini ✨")
+    st.subheader("🤖 Assistente Gemini")
     
     chat_box = st.container(height=450)
     for m in st.session_state.mensagens:
         chat_box.chat_message(m["role"]).markdown(m["content"])
 
-    if prompt := st.chat_input("Pergunte qualquer coisa sobre o arquivo..."):
+    if prompt := st.chat_input("Pergunte ao Gemini sobre os dados..."):
         st.session_state.mensagens.append({"role": "user", "content": prompt})
         chat_box.chat_message("user").markdown(prompt)
 
         with chat_box.chat_message("assistant"):
-            with st.spinner("Gemini pensando..."):
-                # CRIANDO O PROMPT "ESPECIALIZADO" PARA O GEMINI
-                instrucao_ia = f"""
+            with st.spinner("Consultando o Gemini..."):
+                # PROMPT ESPECIALIZADO
+                instrucao = f"""
                 Você é uma IA especialista em Neuroengenharia e pesquisadora da UFABC. 
-                Contexto do arquivo atual: {contexto_tecnico}.
-                Pergunta da Sabrina: {prompt}
-                Responda de forma técnica, porém objetiva, citando conceitos científicos se necessário.
+                Contexto técnico: {contexto_tecnico}.
+                Usuário: Sabrina Nakamura.
+                Pergunta: {prompt}
+                Responda com autoridade científica, mas de forma clara.
                 """
                 
                 try:
-                    response = model.generate_content(instrucao_ia)
-                    texto_resposta = response.text
-                except Exception as e:
-                    texto_resposta = f"Ops, tive um erro ao falar com o Gemini: {e}"
+                    # Se 'gemini-1.5-flash' der 404, o código tentará o 'gemini-1.5-pro' como backup
+                    response = model.generate_content(instrucao)
+                    txt = response.text
+                except Exception as err:
+                    txt = f"Desculpe, Sabrina. Tive um problema de conexão com o modelo: {err}. Verifique se o nome do modelo está correto para a sua região."
 
-                st.markdown(texto_resposta)
-                st.session_state.mensagens.append({"role": "assistant", "content": texto_resposta})
+                st.markdown(txt)
+                st.session_state.mensagens.append({"role": "assistant", "content": txt})
         st.rerun()
