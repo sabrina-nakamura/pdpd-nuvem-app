@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import tempfile
 import mne
-from nilearn import plotting
+from nilearn import plotting, image
 import matplotlib.pyplot as plt
 
 st.title("Laboratório Universal do PDPD 🧠")
