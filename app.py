@@ -1,4 +1,49 @@
-# ==========================================
+import streamlit as st
+import os
+import tempfile
+import mne
+import pandas as pd
+import matplotlib.pyplot as plt
+from nilearn import plotting, image
+
+st.title("Laboratório Universal do PDPD 🧠")
+st.write("Faça o upload do seu arquivo de neuroimagem, sinais ou tabelas de eventos.")
+
+# A PORTA FOI ABERTA PARA TODOS OS FORMATOS:
+arquivo_carregado = st.file_uploader("Arraste seu arquivo (.edf, .set, .nii, .nii.gz, .tsv, .csv)", 
+                                     type=["edf", "set", "vhdr", "nii", "nii.gz", "tsv", "csv"])
+
+if arquivo_carregado is not None:
+    nome_arquivo = arquivo_carregado.name
+    extensao = os.path.splitext(nome_arquivo)[1].lower()
+    if nome_arquivo.endswith(".nii.gz"):
+        extensao = ".nii.gz"
+
+    st.divider()
+    st.markdown(f"### Arquivo em análise: `{nome_arquivo}`")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=extensao) as tmp_file:
+        tmp_file.write(arquivo_carregado.getvalue())
+        caminho_temporario = tmp_file.name
+
+    # ==========================================
+    # ROTA 1: RESSONÂNCIA MAGNÉTICA (NILEARN)
+    # ==========================================
+    if extensao in ['.nii', '.nii.gz']:
+        st.success("👁️ Formato de Imagem Médica (MRI) detectado!")
+        comando = st.radio("Escolha a análise:", ["Visualizar Fatias 3D"])
+        
+        if st.button("Executar Análise"):
+            with st.spinner("Fatiando o filme 4D e desenhando o cérebro 3D... Aguarde!"):
+                try:
+                    imagem_3d = image.index_img(caminho_temporario, 0)
+                    st.subheader("Visualização Interativa (Frame 0)")
+                    html_view = plotting.view_img(imagem_3d, bg_img=False).get_iframe()
+                    st.components.v1.html(html_view, height=450)
+                except Exception as e:
+                    st.error(f"Erro ao processar a imagem: {e}")
+
+    # ==========================================
     # ROTA 2: ELETROENCEFALOGRAMA (MNE)
     # ==========================================
     elif extensao in ['.edf', '.set', '.vhdr']:
@@ -12,7 +57,7 @@
         if st.button("Executar Análise"):
             with st.spinner("Lendo os sensores do EEG..."):
                 try:
-                    # O "Pulo do Gato": Tenta ler contínuo. Se falhar por estar picotado, lê como épocas!
+                    # Tenta ler contínuo. Se falhar por estar picotado, lê como épocas!
                     try:
                         raw = mne.io.read_raw(caminho_temporario, preload=True)
                         tipo_dado = "continuo"
@@ -46,3 +91,23 @@
                         
                 except Exception as e:
                     st.error(f"Erro ao processar as ondas: {e}")
+
+    # ==========================================
+    # ROTA 3: TABELAS DE EVENTOS (PANDAS)
+    # ==========================================
+    elif extensao in ['.tsv', '.csv']:
+        st.success("📊 Formato de Tabela de Dados detectado!")
+        comando = st.radio("Escolha a análise:", ["Visualizar Tabela Bruta", "Resumo Estatístico"])
+        
+        if st.button("Executar Análise"):
+            with st.spinner("Montando a tabela..."):
+                try:
+                    separador = '\t' if extensao == '.tsv' else ','
+                    tabela = pd.read_csv(caminho_temporario, sep=separador)
+                    
+                    if comando == "Visualizar Tabela Bruta":
+                        st.dataframe(tabela)
+                    elif comando == "Resumo Estatístico":
+                        st.write(tabela.describe())
+                except Exception as e:
+                    st.error(f"Erro ao ler a tabela: {e}")
