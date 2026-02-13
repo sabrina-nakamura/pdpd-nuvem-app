@@ -54,7 +54,7 @@ if arquivo_carregado is not None:
             "1. Informações Básicas", 
             "2. Plotar Ondas Brutas", 
             "3. Aplicar Filtro Passa-Banda (1-30 Hz)",
-            "4. 🤖 Analisar com Inteligência Artificial"
+            "4. Analisar com Inteligência Artificial ✨"
         ])
         
         if st.button("Executar Análise"):
