@@ -72,7 +72,7 @@ with col_visual:
 # CHAT COM GEMINI (DIREITA)
 # ============================================
 with col_chat:
-    st.subheader("🤖 Assistente Gemini")
+    st.subheader("✨ Assistente Gemini")
     
     chat_box = st.container(height=450)
     for m in st.session_state.mensagens:
