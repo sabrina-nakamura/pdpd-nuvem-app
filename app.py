@@ -1,57 +1,45 @@
 import streamlit as st
+import tempfile
 import os
-import mne
-from nilearn import plotting
 
-st.title("Painel análise de BIDS - PDPD 🧠")
-st.write("Bem-vindo ao analisador interativo. Por favor, dê os comandos abaixo:")
+st.title("Laboratório de Neuroengenharia 🧠")
+st.write("Faça o upload de um arquivo para iniciar a análise.")
 
-caminho_bids = "dados_bids"
+# 1. PASSO 1: O UPLOAD
+# O site fica esperando o usuário colocar o arquivo
+arquivo_carregado = st.file_uploader("Arraste seu arquivo (.edf, .set, .nii.gz)", type=["edf", "set", "nii.gz"])
 
-# 1. O programa "lê" o que tem no banco de dados e lista para o usuário
-try:
-    # Acha todas as pastas que começam com "sub-"
-    sujeitos_disponiveis = [f for f in os.listdir(caminho_bids) if f.startswith("sub-")]
-    sujeitos_disponiveis.sort() # Deixa em ordem alfabética
-except FileNotFoundError:
-    st.error("Pasta 'dados_bids' não encontrada. Verifique os arquivos do projeto.")
-    sujeitos_disponiveis = []
+# Se o usuário carregou alguma coisa, o site entra nesta parte:
+if arquivo_carregado is not None:
+    st.success(f"Arquivo '{arquivo_carregado.name}' lido com sucesso pela nuvem!")
+    
+    # O site cria um arquivo temporário na nuvem para as bibliotecas conseguirem ler depois
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{arquivo_carregado.name.split('.')[-1]}") as tmp_file:
+        tmp_file.write(arquivo_carregado.getvalue())
+        caminho_temporario = tmp_file.name
 
-# 2. O COMANDO DO USUÁRIO: Escolhendo o sujeito
-if sujeitos_disponiveis:
-    sujeito_escolhido = st.selectbox("1️⃣ Qual paciente você quer analisar?", sujeitos_disponiveis)
+    st.divider() # Linha para separar visualmente
+
+    # 2. PASSO 2: O COMANDO
+    st.markdown("### O que você quer fazer com este arquivo?")
+    comando_escolhido = st.radio(
+        "Selecione uma ação para o site executar:", 
+        ["Visualizar Informações Básicas", "Plotar Gráfico Bruto", "Aplicar Filtro Passa-Banda (1-30 Hz)"]
+    )
     
-    st.write(f"Você selecionou o paciente: **{sujeito_escolhido}**")
-    
-    # Caminho para dentro da pasta do paciente escolhido
-    caminho_sujeito = os.path.join(caminho_bids, sujeito_escolhido)
-    
-    # 3. O COMANDO DO USUÁRIO: Escolhendo o tipo de dado (Anatomia, Funcional, EEG)
-    tipo_dado = st.radio("2️⃣ Que tipo de exame você quer carregar?", ["Ressonância Anatômica (anat)", "Ressonância Funcional (func)", "Eletroencefalograma (eeg)"])
-    
-    # Botão de Ação
-    if st.button("Executar Análise"):
-        st.info("Processando o comando...")
+    # 3. PASSO 3: A EXECUÇÃO
+    if st.button("Executar Comando"):
+        st.info("Processando o seu comando...")
         
-        # Aqui entra a lógica dependendo do que ele escolheu!
-        if "func" in tipo_dado:
-            pasta_func = os.path.join(caminho_sujeito, "func")
-            # Procura o arquivo .nii.gz dentro da pasta func
-            try:
-                arquivos_func = [f for f in os.listdir(pasta_func) if f.endswith(".nii.gz")]
-                if arquivos_func:
-                    arquivo_alvo = os.path.join(pasta_func, arquivos_func[0])
-                    st.success(f"Lendo o arquivo: {arquivos_func[0]}")
-                    
-                    # Exibe o cérebro
-                    st.subheader("Visualização 3D")
-                    html_view = plotting.view_img(arquivo_alvo, bg_img=False).get_iframe()
-                    st.components.v1.html(html_view, height=400)
-                else:
-                    st.warning("Nenhum arquivo de ressonância encontrado para este paciente.")
-            except FileNotFoundError:
-                 st.warning("Este paciente não possui a pasta 'func'.")
-                 
-        elif "eeg" in tipo_dado:
-            st.write("Aqui o programa vai ler os arquivos de EEG usando o MNE!")
-            # (Podemos adicionar a lógica do MNE aqui depois!)
+        # O site obedece de acordo com o que foi escolhido no menu
+        if comando_escolhido == "Visualizar Informações Básicas":
+            st.write("Aqui o código do MNE vai ler os canais e a frequência de amostragem.")
+            # st.write(raw.info) <-- Lógica real entraria aqui
+            
+        elif comando_escolhido == "Plotar Gráfico Bruto":
+            st.write("Aqui o código vai gerar a imagem das ondas cerebrais sem tratamento.")
+            # fig = raw.plot() <-- Lógica real entraria aqui
+            
+        elif comando_escolhido == "Aplicar Filtro Passa-Banda (1-30 Hz)":
+            st.write("Aqui o código vai filtrar o sinal e remover os ruídos musculares!")
+            # raw.filter(1, 30) <-- Lógica real entraria aqui
