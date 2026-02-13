@@ -1,45 +1,83 @@
 import streamlit as st
-import tempfile
 import os
+import tempfile
+import mne
+from nilearn import plotting
+import matplotlib.pyplot as plt
 
-st.title("Laboratório de Neuroengenharia 🧠")
-st.write("Faça o upload de um arquivo para iniciar a análise.")
+st.title("Laboratório Universal do PDPD 🧠")
+st.write("Faça o upload do seu arquivo de neuroimagem ou sinais. O sistema fará o roteamento automático.")
 
-# 1. PASSO 1: O UPLOAD
-# O site fica esperando o usuário colocar o arquivo
-arquivo_carregado = st.file_uploader("Arraste seu arquivo (.edf, .set, .nii.gz)", type=["edf", "set", "nii.gz"])
+# A CAIXA ABERTA
+arquivo_carregado = st.file_uploader("Arraste seu arquivo (.edf, .set, .nii, .nii.gz)", type=["edf", "set", "vhdr", "nii", "nii.gz"])
 
-# Se o usuário carregou alguma coisa, o site entra nesta parte:
 if arquivo_carregado is not None:
-    st.success(f"Arquivo '{arquivo_carregado.name}' lido com sucesso pela nuvem!")
+    nome_arquivo = arquivo_carregado.name
     
-    # O site cria um arquivo temporário na nuvem para as bibliotecas conseguirem ler depois
-    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{arquivo_carregado.name.split('.')[-1]}") as tmp_file:
+    # Descobrindo a extensão real do arquivo
+    extensao = os.path.splitext(nome_arquivo)[1].lower()
+    if nome_arquivo.endswith(".nii.gz"):
+        extensao = ".nii.gz"
+
+    st.divider()
+    st.markdown(f"### Arquivo em análise: `{nome_arquivo}`")
+
+    # TRUQUE DE MESTRE: Criando o arquivo físico temporário para as bibliotecas lerem
+    with tempfile.NamedTemporaryFile(delete=False, suffix=extensao) as tmp_file:
         tmp_file.write(arquivo_carregado.getvalue())
         caminho_temporario = tmp_file.name
 
-    st.divider() # Linha para separar visualmente
-
-    # 2. PASSO 2: O COMANDO
-    st.markdown("### O que você quer fazer com este arquivo?")
-    comando_escolhido = st.radio(
-        "Selecione uma ação para o site executar:", 
-        ["Visualizar Informações Básicas", "Plotar Gráfico Bruto", "Aplicar Filtro Passa-Banda (1-30 Hz)"]
-    )
-    
-    # 3. PASSO 3: A EXECUÇÃO
-    if st.button("Executar Comando"):
-        st.info("Processando o seu comando...")
+    # ==========================================
+    # ROTA 1: RESSONÂNCIA MAGNÉTICA (NILEARN)
+    # ==========================================
+    if extensao in ['.nii', '.nii.gz']:
+        st.success("👁️ Formato de Imagem Médica (MRI) detectado!")
+        comando = st.radio("Escolha a análise:", ["Visualizar Fatias 3D"])
         
-        # O site obedece de acordo com o que foi escolhido no menu
-        if comando_escolhido == "Visualizar Informações Básicas":
-            st.write("Aqui o código do MNE vai ler os canais e a frequência de amostragem.")
-            # st.write(raw.info) <-- Lógica real entraria aqui
-            
-        elif comando_escolhido == "Plotar Gráfico Bruto":
-            st.write("Aqui o código vai gerar a imagem das ondas cerebrais sem tratamento.")
-            # fig = raw.plot() <-- Lógica real entraria aqui
-            
-        elif comando_escolhido == "Aplicar Filtro Passa-Banda (1-30 Hz)":
-            st.write("Aqui o código vai filtrar o sinal e remover os ruídos musculares!")
-            # raw.filter(1, 30) <-- Lógica real entraria aqui
+        if st.button("Executar Análise"):
+            with st.spinner("Desenhando o cérebro 3D... Isso exige muito processamento, aguarde uns segundos!"):
+                try:
+                    # O nilearn lê o arquivo temporário e gera o HTML interativo
+                    st.subheader("Visualização Interativa")
+                    html_view = plotting.view_img(caminho_temporario, bg_img=False).get_iframe()
+                    st.components.v1.html(html_view, height=450)
+                except Exception as e:
+                    st.error(f"Erro ao processar a imagem: {e}")
+
+    # ==========================================
+    # ROTA 2: ELETROENCEFALOGRAMA (MNE)
+    # ==========================================
+    elif extensao in ['.edf', '.set', '.vhdr']:
+        st.success("🧠 Formato de Ondas Cerebrais (EEG) detectado!")
+        comando = st.radio("Escolha a análise:", [
+            "1. Informações Básicas", 
+            "2. Plotar Ondas Brutas", 
+            "3. Aplicar Filtro Passa-Banda (1-30 Hz)"
+        ])
+        
+        if st.button("Executar Análise"):
+            with st.spinner("Lendo os sensores do EEG..."):
+                try:
+                    # O MNE lê o arquivo temporário
+                    raw = mne.io.read_raw(caminho_temporario, preload=True)
+                    
+                    if comando == "1. Informações Básicas":
+                        st.write(f"**Quantidade de Canais:** {len(raw.ch_names)}")
+                        st.write(f"**Frequência de Amostragem:** {raw.info['sfreq']} Hz")
+                        st.write(f"**Duração da Gravação:** {raw.times[-1]:.2f} segundos")
+                        
+                    elif comando == "2. Plotar Ondas Brutas":
+                        # MNE desenha o gráfico e o Streamlit exibe
+                        fig = raw.plot(n_channels=10, show=False)
+                        st.pyplot(fig)
+                        
+                    elif comando == "3. Aplicar Filtro Passa-Banda (1-30 Hz)":
+                        st.info("Filtrando ruídos musculares e de rede elétrica...")
+                        # Copia o dado original e aplica o filtro
+                        raw_filtrado = raw.copy().filter(l_freq=1, h_freq=30)
+                        fig = raw_filtrado.plot(n_channels=10, show=False)
+                        st.pyplot(fig)
+                        st.success("Filtro aplicado com sucesso!")
+                        
+                except Exception as e:
+                    st.error(f"Erro ao processar as ondas: {e}")
