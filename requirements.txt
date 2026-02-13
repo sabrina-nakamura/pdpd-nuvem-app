@@ -4,3 +4,4 @@ mne
 matplotlib
 nilearn
 nibabel
+google-generativeai
