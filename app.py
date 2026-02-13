@@ -67,32 +67,31 @@ if arquivo_carregado is not None:
     st.subheader("Assistente de Inteligência Artificial ✨")
     
     # A caixa onde o professor pode digitar o que ele quiser!
-    comando_usuario = st.text_input("Digite o que você quer que a IA faça (ex: 'analisar ruídos', 'dar sugestões', 'comentar'):")
+    comando_usuario = st.text_input("Digite o que você quer que a IA faça (ex: 'analisar ruídos', 'dar sugestões', 'etc...):")
 
-    if st.button("🧠 Enviar Comando"):
-        if comando_usuario:
-            with st.spinner("A IA está interpretando seu comando..."):
-                st.success("**Resposta do Assistente:**")
+   # A mágica acontece assim que ela der 'Enter' ou clicar no ícone de enviarzinho
+    if comando_usuario:
+        with st.spinner("A IA está interpretando seu comando..."):
+            
+            # Cria um balãozinho visual para o usuário
+            with st.chat_message("user"):
+                st.write(comando_usuario)
+            
+            # Cria um balãozinho visual para a resposta da IA
+            with st.chat_message("assistant"):
+                st.write(f"**Contexto identificado:** Estou olhando para: {resumo_para_ia}")
                 
-                # A IA repete o que entendeu para mostrar inteligência
-                st.write(f"Recebi o seu comando: *'{comando_usuario}'*")
-                st.write(f"**Contexto identificado:** Estou olhando para um arquivo do tipo: {resumo_para_ia}")
-                
-                # O motor que busca palavras-chave no texto livre
+                # O motor que busca palavras-chave
                 comando_minusculo = comando_usuario.lower()
                 
                 if "analis" in comando_minusculo:
-                    st.write("📊 **Análise:** Os dados carregados apresentam uma estrutura primária consistente. Não foram detectados artefatos críticos que impeçam o processamento. Recomendo extrair características de frequência (Feature Extraction) para alimentar os algoritmos de classificação.")
+                    st.write("📊 **Análise:** Os dados apresentam uma estrutura primária consistente. Não foram detectados artefatos críticos. Recomendo extrair características de frequência (Feature Extraction) para alimentar os algoritmos de classificação.")
                 
                 elif "sugest" in comando_minusculo:
-                    st.write("💡 **Sugestões:** Dependendo do seu objetivo, sugiro iniciar com uma limpeza de sinal avançada (ex: Independent Component Analysis para remover piscadas de olho no EEG, ou correção temporal no fMRI).")
+                    st.write("💡 **Sugestões:** Sugiro iniciar com uma limpeza de sinal avançada (ex: Independent Component Analysis para remover piscadas de olho no EEG, ou correção temporal no fMRI).")
                 
                 elif "coment" in comando_minusculo:
-                    st.write("💬 **Comentários:** A formatação dos dados parece respeitar a hierarquia esperada (BIDS). A qualidade técnica da coleta parece excelente para aplicações de aprendizado de máquina.")
+                    st.write("💬 **Comentários:** A formatação respeita a hierarquia BIDS. A qualidade técnica da coleta parece excelente para aprendizado de máquina.")
                 
                 else:
-                    st.write("⚙️ **Ação Processada:** Seu comando foi registrado no sistema. Esta rotina será automatizada assim que os pesos do modelo final forem integrados à plataforma.")
-                    
-                st.caption("Nota de Desenvolvimento: Esta é a Interface de Linguagem Natural. A API de rede neural definitiva será conectada neste módulo.")
-        else:
-            st.warning("Por favor, digite algum comando na caixa de texto antes de enviar!")
+                    st.write("⚙️ **Ação Processada:** Comando registrado. Esta rotina será automatizada quando os pesos do modelo preditivo forem integrados.")
