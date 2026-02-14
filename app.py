@@ -9,7 +9,7 @@ from nilearn import plotting, image
 st.set_page_config(page_title="NeuroLab UFABC", page_icon="🧠", layout="wide")
 
 st.title("🧠 NeuroLab: Plataforma de Visualização e Pré-processamento")
-st.caption("Projeto PDPD - Bachelor's in Science and Technology (UFABC)")
+st.caption("Projeto PDPD (UFABC)")
 
 # --- BARRA LATERAL (UPLOAD E CONFIGURAÇÕES) ---
 with st.sidebar:
