@@ -18,11 +18,11 @@ except Exception as e:
 st.set_page_config(page_title="NeuroLab Gemini", page_icon="🧠", layout="wide")
 
 st.title("🧠 NeuroLab + Gemini AI 1.5")
-st.caption("Assistente de Neuroengenharia conectado ao cérebro do Google.")
+st.caption("Assistente de Neurociencia conectado ao cérebro do Google.")
 
 # Memória do Chat
 if "mensagens" not in st.session_state:
-    st.session_state.mensagens = [{"role": "assistant", "content": "Olá, Sabrina! O Gemini está pronto. Vamos analisar esses dados do seu PDPD?"}]
+    st.session_state.mensagens = [{"role": "assistant", "content": "Olá, Sabrina! O Gemini está pronto. Vamos analisar o dataset?"}]
 
 # ============================================
 # BARRA LATERAL (UPLOAD)
